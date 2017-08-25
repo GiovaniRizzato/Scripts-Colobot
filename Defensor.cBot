@@ -1,0 +1,240 @@
+void esperaConfeccao(int categoria){
+	
+	object novoObjeto = radar(categoria);
+	
+	while(novoObjeto == null){
+		novoObjeto = radar(categoria, 0, 360, 1);
+	}
+}
+
+void object::getOre()
+{
+	esperaConfeccao(TitaniumOre);
+	goto(radar(TitaniumOre).position);
+	grab();
+}
+
+void object::getTitanium()
+{
+	getOre();
+	goto(radar(Converter).position);
+	drop();
+	move(-3);
+	esperaConfeccao(Titanium);
+	goto(radar(Titanium).position);
+	grab();
+}
+
+void object::getPowerCell(){
+	
+	object powerCellSobrando = radar(PowerCell);
+	if(powerCellSobrando == null){
+		getTitanium();
+		object powerPlant = radar(PowerPlant);
+		goto(powerPlant.position);
+		drop();
+		while(powerPlant.energyCell.category != PowerCell){
+			wait(0.05);
+		}
+		grab();
+	}else{
+		goto(powerCellSobrando.position);
+		grab();
+		Recarregar();
+	}
+}
+
+void object::Pesquisar(int tipoPesquisa){
+	
+	getPowerCell();
+	object centroPesquisa = radar(ResearchCenter);
+	goto(centroPesquisa.position);
+	
+	if(centroPesquisa.energyCell != null){
+		trocaBateria();
+	}else{
+		drop();
+	}
+	
+	centroPesquisa.research(tipoPesquisa);
+}
+
+point object::procuraEspacoVazio(){
+	goto(flatspace(this.position,10,10,40,8));
+}
+
+void object::trocaBateria(){
+	turn(90);
+	drop();
+	turn(-90);
+	grab();
+	turn(-90);
+	drop();
+	turn(180);
+	grab();
+	turn(-90);
+	drop();
+}
+
+void object::Contruir(int categoria){
+	getTitanium();
+	procuraEspacoVazio();
+	drop();
+	build(categoria);
+}
+
+void object::Contruir(int categoria, point local){
+	getTitanium();
+	goto(local);
+	drop();
+	build(categoria);
+}
+
+point object::pontoMedio(point p1, point p2, float proximidade){
+	
+	int x = ((p2.x - p1.x) * proximidade) + p1.x;
+	int y = ((p2.y - p1.y) * proximidade) + p1.y;
+	int z = ((p2.z - p1.z) * proximidade) + p1.z;
+	
+	return new point(x,y,z);
+}
+
+void object::ContruirBot(int categoria, string programa){
+	
+	object fabricaBot = radar(BotFactory);
+	
+	getTitanium();
+	goto(fabricaBot.position);
+	drop();
+	move(-3);
+	fabricaBot.factory(WingedShooter, programa);
+	getPowerCell();
+	goto(fabricaBot.position);
+	drop();
+}
+
+extern void object::BasicOne()
+{
+	grab();
+	move(-5);
+	drop();
+	build(Converter);
+	Contruir(PowerPlant);
+	Contruir(ResearchCenter);
+	Pesquisar(ResearchDefenseTower);
+	
+	object conversor = radar(Converter);
+	object inimido = radar(AlienAnt);
+	point towerPos = pontoMedio(conversor.position, inimido.position, 0.15);
+	Contruir(DefenseTower, towerPos);
+	getPowerCell();
+	goto(radar(DefenseTower).position);
+	drop();
+	
+	Contruir(PowerStation);
+	Pesquisar(ResearchShooter);
+	Contruir(BotFactory);
+	Pesquisar(ResearchWinged);
+	ContruirBot(WheeledGrabber, "RecarregarTorre");
+	
+	while(true)
+	{
+		if(this.energyLevel < 0.25){
+			Recarregar();
+		}else{
+			ContruirBot(WingedShooter, "Atacar");
+		}
+	}
+}
+
+public void object::RecarregarTorre(){
+	
+	object torre = radar(DefenseTower);
+	goto(torre.position);
+	while(true){
+		while(torre.energyLevel > 0) wait(0.05);
+		goto(torre.position);
+		grab();
+		Recarregar();
+		goto(torre.position);
+		drop();
+	}
+}
+
+public void object::Recarregar()
+{
+	object ps = radar(PowerStation,0,360,0,1000,1,FilterFriendly);
+	goto(ps.position);
+	if(this.load != null && this.load.category == PowerCell)
+	{
+		while(this.load.energyLevel < 1) wait(0.05);
+	}
+	while(this.energyLevel < 1) wait(0.05);
+}
+
+public void object::Atacar()
+{
+	while(this.energyCell == null) wait(0.05);
+	while(radar(Any, 180, 45, 0, 5) != null) wait(0.05);
+	move(-7.5);
+	
+	while(true)
+	{
+		bool isInFront = true;
+		object item = radar(AlienAnt);
+		if (item == null)
+		{
+			isInFront = false;
+			item = radar(AlienAnt);
+			if (item == null)
+			{
+				wait(0.05);
+				continue;
+			}else{
+				turn(direction(item.position));
+				continue;
+			}
+		}
+		
+		float targetHeight = topo(this.position);
+		if(targetHeight < 0) targetHeight = 0;
+		targetHeight += 9;
+		
+		float targetSpeed = distance(this.position, item.position)/40;
+		if(targetSpeed > 1) targetSpeed = 1;
+		if(!isInFront) targetSpeed = 1;
+		
+		float targetDirection = direction(item.position);
+		
+		bool canShoot = true;
+		if(abs(targetDirection) > 10) canShoot = false;
+		if(distance(this.position, item.position) > 40) canShoot = false;
+		
+		float H = item.position.z-this.position.z;
+		float L = distance2d(this.position, item.position);
+		float angle = atan(H/L);
+		if(aim(angle, -targetDirection) != 0) canShoot = false; // funkcja aim() zwraca != 0 jesli cel poza zasiegiem
+		
+		if(!canShoot) targetSpeed = 1;
+		if(distance(this.position, item.position) < 20) targetSpeed = 0;
+		
+		jet((targetHeight-this.position.z)/4);
+		if(targetDirection < 0)
+		{
+			motor(targetSpeed, targetSpeed+targetDirection/90);
+		}
+		else
+		{
+			motor(targetSpeed-targetDirection/90, targetSpeed);
+		}
+		
+		if(canShoot)
+		{
+			fire(0.1);
+		}
+		else
+		{
+			wait(0.05);
+		}
+	}
+}
