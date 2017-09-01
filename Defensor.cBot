@@ -135,8 +135,6 @@ extern void object::BasicOne()
 	Pesquisar(ResearchShooter);
 	Contruir(BotFactory);
 	Pesquisar(ResearchWinged);
-	ContruirBot(WheeledGrabber, "RecarregarTorre");
-	
 	while(true)
 	{
 		if(this.energyLevel < 0.25){
@@ -144,20 +142,6 @@ extern void object::BasicOne()
 		}else{
 			ContruirBot(WingedShooter, "Atacar");
 		}
-	}
-}
-
-public void object::RecarregarTorre(){
-	
-	object torre = radar(DefenseTower);
-	goto(torre.position);
-	while(true){
-		while(torre.energyLevel > 0) wait(0.05);
-		goto(torre.position);
-		grab();
-		Recarregar();
-		goto(torre.position);
-		drop();
 	}
 }
 
